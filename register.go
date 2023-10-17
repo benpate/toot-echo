@@ -1,42 +1,57 @@
 package tootecho
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/benpate/derp"
 	"github.com/benpate/toot"
+	"github.com/benpate/toot/route"
 	"github.com/labstack/echo/v4"
 )
 
+type echoMethod func(string, echo.HandlerFunc, ...echo.MiddlewareFunc) *echo.Route
+
 func Register(e *echo.Echo, api toot.API) {
 
+	fmt.Println("REGISTER: BEGIN")
+
 	// https://docs.joinmastodon.org/methods/accounts/
-	e.POST("/api/v1/accounts", wrap(api.PostAccounts))
-	e.GET("/api/v1/accounts/verify_credentials", wrap(api.GetAccounts_VerifyCredentials))
-	e.PATCH("/api/v1/accounts/update_credentials", wrap(api.PatchAccounts_UpdateCredentials))
-	e.GET("/api/v1/accounts/:id", wrap(api.GetAccount))
-	e.GET("/api/v1/accounts/:id/statuses", wrap(api.GetAccount_Statuses))
-	e.GET("/api/v1/accounts/:id/followers", wrap(api.GetAccount_Followers))
-	e.GET("/api/v1/accounts/:id/following", wrap(api.GetAccount_Following))
-	e.GET("/api/v1/accounts/:id/featured_tags", wrap(api.GetAccount_FeaturedTags))
-	e.POST("/api/v1/accounts/:id/follow", wrap(api.PostAccount_Follow))
-	e.POST("/api/v1/accounts/:id/unfollow", wrap(api.PostAccount_Unfollow))
-	e.POST("/api/v1/accounts/:id/block", wrap(api.PostAccount_Block))
-	e.POST("/api/v1/accounts/:id/unblock", wrap(api.PostAccount_Unblock))
-	e.POST("/api/v1/accounts/:id/mute", wrap(api.PostAccount_Mute))
-	e.POST("/api/v1/accounts/:id/unmute", wrap(api.PostAccount_Unmute))
-	e.POST("/api/v1/accounts/:id/pin", wrap(api.PostAccount_Pin))
-	e.POST("/api/v1/accounts/:id/unpin", wrap(api.PostAccount_Unpin))
-	e.POST("/api/v1/accounts/:id/note", wrap(api.PostAccount_Note))
-	e.GET("/api/v1/accounts/relationships", wrap(api.GetAccount_Relationships))
-	e.GET("/api/v1/accounts/:id/familiar_followers", wrap(api.GetAccount_FamiliarFollowers))
-	e.GET("/api/v1/accounts/search", wrap(api.GetAccount_Search))
-	e.GET("/api/v1/accounts/lookup", wrap(api.GetAccount_Lookup))
+	register(e.POST, route.PostAccount, api.PostAccount)
+	register(e.GET, route.GetAccount_VerifyCredentials, api.GetAccount_VerifyCredentials)
+	register(e.PATCH, route.PatchAccount_UpdateCredentials, api.PatchAccount_UpdateCredentials)
+	register(e.GET, route.GetAccount, api.GetAccount)
+	register(e.GET, route.GetAccount_Statuses, api.GetAccount_Statuses)
+	register(e.GET, route.GetAccount_Followers, api.GetAccount_Followers)
+	register(e.GET, route.GetAccount_Following, api.GetAccount_Following)
+	register(e.GET, route.GetAccount_FeaturedTags, api.GetAccount_FeaturedTags)
+	register(e.POST, route.PostAccount, api.PostAccount_Follow)
+	register(e.POST, route.PostAccount_Unfollow, api.PostAccount_Unfollow)
+	register(e.POST, route.PostAccount_Block, api.PostAccount_Block)
+	register(e.POST, route.PostAccount_Unblock, api.PostAccount_Unblock)
+	register(e.POST, route.PostAccount_Mute, api.PostAccount_Mute)
+	register(e.POST, route.PostAccount_Unmute, api.PostAccount_Unmute)
+	register(e.POST, route.PostAccount_Pin, api.PostAccount_Pin)
+	register(e.POST, route.PostAccount_Unpin, api.PostAccount_Unpin)
+	register(e.POST, route.PostAccount_Note, api.PostAccount_Note)
+	register(e.GET, route.PostAccount_Relationships, api.GetAccount_Relationships)
+	register(e.GET, route.GetAccount_FamiliarFollowers, api.GetAccount_FamiliarFollowers)
+	register(e.GET, route.GetAccount_Search, api.GetAccount_Search)
+	register(e.GET, route.GetAccount_Lookup, api.GetAccount_Lookup)
 
 	// https://docs.joinmastodon.org/methods/apps/
-	e.POST("/api/v1/apps", wrap(api.PostApplication))
-	e.GET("/api/v1/apps/verify_credentials", wrap(api.GetApplication_VerifyCredentials), authorize(api))
+	register(e.POST, route.PostApplication, api.PostApplication)
+	register(e.GET, route.GetApplication_VerifyCredentials, api.GetApplication_VerifyCredentials, authorize(api))
+}
 
+func register[Input any, Output any](method echoMethod, path string, handler toot.APIFunc[Input, Output], middleware ...echo.MiddlewareFunc) {
+	if handler != nil {
+		fmt.Println("REGISTER-YUP: " + path)
+		method(path, wrap(handler), middleware...)
+		return
+	}
+
+	fmt.Println("REGISTER-NAH: " + path)
 }
 
 func authorize(api toot.API, scopes ...string) echo.MiddlewareFunc {
