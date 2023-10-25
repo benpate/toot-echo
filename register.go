@@ -8,6 +8,7 @@ import (
 	"github.com/benpate/rosetta/list"
 	"github.com/benpate/toot"
 	"github.com/benpate/toot/route"
+	"github.com/benpate/toot/scope"
 	"github.com/labstack/echo/v4"
 )
 
@@ -18,35 +19,35 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 	fmt.Println("REGISTER: BEGIN")
 
 	// https://docs.joinmastodon.org/methods/accounts/
-	register(api, e.POST, route.PostAccount, api.PostAccount, "*")
-	register(api, e.GET, route.GetAccount_VerifyCredentials, api.GetAccount_VerifyCredentials, "*")
-	register(api, e.PATCH, route.PatchAccount_UpdateCredentials, api.PatchAccount_UpdateCredentials, "*")
-	register(api, e.GET, route.GetAccount, api.GetAccount, "*")
-	register(api, e.GET, route.GetAccount_Statuses, api.GetAccount_Statuses, "*")
-	register(api, e.GET, route.GetAccount_Followers, api.GetAccount_Followers, "*")
-	register(api, e.GET, route.GetAccount_Following, api.GetAccount_Following, "*")
-	register(api, e.GET, route.GetAccount_FeaturedTags, api.GetAccount_FeaturedTags, "*")
-	register(api, e.POST, route.PostAccount, api.PostAccount_Follow, "*")
-	register(api, e.POST, route.PostAccount_Unfollow, api.PostAccount_Unfollow, "*")
-	register(api, e.POST, route.PostAccount_Block, api.PostAccount_Block, "*")
-	register(api, e.POST, route.PostAccount_Unblock, api.PostAccount_Unblock, "*")
-	register(api, e.POST, route.PostAccount_Mute, api.PostAccount_Mute, "*")
-	register(api, e.POST, route.PostAccount_Unmute, api.PostAccount_Unmute, "*")
-	register(api, e.POST, route.PostAccount_Pin, api.PostAccount_Pin, "*")
-	register(api, e.POST, route.PostAccount_Unpin, api.PostAccount_Unpin, "*")
-	register(api, e.POST, route.PostAccount_Note, api.PostAccount_Note, "*")
-	register(api, e.GET, route.PostAccount_Relationships, api.GetAccount_Relationships, "*")
-	register(api, e.GET, route.GetAccount_FamiliarFollowers, api.GetAccount_FamiliarFollowers, "*")
-	register(api, e.GET, route.GetAccount_Search, api.GetAccount_Search, "*")
-	register(api, e.GET, route.GetAccount_Lookup, api.GetAccount_Lookup, "*")
+	register(api, e.POST, route.PostAccount, api.PostAccount, scope.PostAccount)
+	register(api, e.GET, route.GetAccount_VerifyCredentials, api.GetAccount_VerifyCredentials, scope.GetAccount_VerifyCredentials)
+	register(api, e.PATCH, route.PatchAccount_UpdateCredentials, api.PatchAccount_UpdateCredentials, scope.PatchAccount_UpdateCredentials)
+	register(api, e.GET, route.GetAccount, api.GetAccount, scope.GetAccount)
+	register(api, e.GET, route.GetAccount_Statuses, api.GetAccount_Statuses, scope.GetAccount_Statuses)
+	register(api, e.GET, route.GetAccount_Followers, api.GetAccount_Followers, scope.GetAccount_Followers)
+	register(api, e.GET, route.GetAccount_Following, api.GetAccount_Following, scope.GetAccount_Following)
+	register(api, e.GET, route.GetAccount_FeaturedTags, api.GetAccount_FeaturedTags, scope.GetAccount_FeaturedTags)
+	register(api, e.POST, route.PostAccount, api.PostAccount_Follow, scope.PostAccont_Follow)
+	register(api, e.POST, route.PostAccount_Unfollow, api.PostAccount_Unfollow, scope.PostAccount_Unfollow)
+	register(api, e.POST, route.PostAccount_Block, api.PostAccount_Block, scope.PostAccount_Block)
+	register(api, e.POST, route.PostAccount_Unblock, api.PostAccount_Unblock, scope.PostAccount_Unblock)
+	register(api, e.POST, route.PostAccount_Mute, api.PostAccount_Mute, scope.PostAccount_Mute)
+	register(api, e.POST, route.PostAccount_Unmute, api.PostAccount_Unmute, scope.PostAccount_Unmute)
+	register(api, e.POST, route.PostAccount_Pin, api.PostAccount_Pin, scope.PostAccount_Pin)
+	register(api, e.POST, route.PostAccount_Unpin, api.PostAccount_Unpin, scope.PostAccount_Unpin)
+	register(api, e.POST, route.PostAccount_Note, api.PostAccount_Note, scope.PostAccount_Note)
+	register(api, e.GET, route.PostAccount_Relationships, api.GetAccount_Relationships, scope.PostAccount_Relationships)
+	register(api, e.GET, route.GetAccount_FamiliarFollowers, api.GetAccount_FamiliarFollowers, scope.GetAccount_FamiliarFollowers)
+	register(api, e.GET, route.GetAccount_Search, api.GetAccount_Search, scope.GetAccount_Search)
+	register(api, e.GET, route.GetAccount_Lookup, api.GetAccount_Lookup, scope.GetAccount_Lookup)
 
 	// https://docs.joinmastodon.org/methods/apps/
-	register(api, e.POST, route.PostApplication, api.PostApplication)
-	register(api, e.GET, route.GetApplication_VerifyCredentials, api.GetApplication_VerifyCredentials, "*")
+	register(api, e.POST, route.PostApplication, api.PostApplication, scope.PostApplication)
+	register(api, e.GET, route.GetApplication_VerifyCredentials, api.GetApplication_VerifyCredentials, scope.GetApplication_VerifyCredentials)
 }
 
 // register inserts a new echo.HandlerFunc into the echo router.
-func register[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc[AuthToken, Input, Output], scopes ...string) {
+func register[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc[AuthToken, Input, Output], requiredScope string) {
 
 	const location = "toot-echo.register"
 
@@ -66,7 +67,7 @@ func register[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[A
 		// then try to authorize the request.
 		// If no scopes are required, then an empty AuthToken
 		// will be passed to the handler.
-		if len(scopes) > 0 {
+		if requiredScope != scope.Public {
 
 			authToken, err = api.Authorize(ctx.Request())
 
@@ -75,8 +76,8 @@ func register[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[A
 			}
 
 			// Verify the scopes required for this API call
-			if !verifyScopes(authToken.Scopes(), scopes) {
-				return derp.NewUnauthorizedError(location, "Request is not authorized.", scopes, authToken.Scopes())
+			if !verifyScope(authToken.Scopes(), requiredScope) {
+				return derp.NewUnauthorizedError(location, "Request is not authorized.", requiredScope, authToken.Scopes())
 			}
 		}
 
@@ -112,29 +113,23 @@ func register[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[A
 
 }
 
-func verifyScopes(present []string, required []string) bool {
-
-	for _, scope := range required {
-		if !verifyScope(present, scope) {
-			return false
-		}
-	}
-
-	return true
-}
-
 // verifyScope confirms that the required scope exists in the
 // `present` slice.
-func verifyScope(present []string, required string) bool {
+func verifyScope(present []string, requiredScope string) bool {
 
-	// "*" is not a Mastodon scope, but an internal placeholder for:
-	// "I don't need specific permissions, just make sure the user is signed in"
-	if required == "*" {
+	// Always allow public requests
+	if requiredScope == scope.Public {
 		return true
 	}
 
-	// if the required scope contains a colon, see if the user has just the "prefix" scope
-	if prefix, suffix := list.Split(required, ':'); suffix != "" {
+	// Since we're already authenticated, "private" requests
+	// with no additional scope requirements are also allowed
+	if requiredScope == scope.Private {
+		return true
+	}
+
+	// If the required scope contains a colon, see if the user has just the "prefix" scope
+	if prefix, suffix := list.Split(requiredScope, ':'); suffix != "" {
 		for _, scope := range present {
 			if scope == prefix {
 				return true
@@ -144,7 +139,7 @@ func verifyScope(present []string, required string) bool {
 
 	// Otherwise, search for the full scope in the `present` list
 	for _, scope := range present {
-		if scope == required {
+		if scope == requiredScope {
 			return true
 		}
 	}

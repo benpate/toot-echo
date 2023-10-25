@@ -10,7 +10,6 @@ require (
 	github.com/benpate/derp v0.28.1
 	github.com/benpate/rosetta v0.18.2
 	github.com/benpate/toot v0.0.1
-	github.com/davecgh/go-spew v1.1.1
 )
 
 require (
