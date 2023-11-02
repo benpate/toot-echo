@@ -10,57 +10,72 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// register inserts a new echo.HandlerFunc into the echo router.
-func register[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc[AuthToken, Input, Output], requiredScope string) {
+// echoMethod represents an e.GET, e.POST, e.PUT, e.DELETE method that registers
+// a new echo.HandlerFunc with the echo router.
+type echoMethod func(string, echo.HandlerFunc, ...echo.MiddlewareFunc) *echo.Route
+
+// commonWrapper is a function that can be used to handle both single results and paged results.
+type commonWrapper[AuthToken toot.ScopesGetter, Input any, Output any] func(echo.Context, AuthToken, Input) (Output, error)
+
+// single_result inserts a new echo.HandlerFunc into the echo router
+// that returns a single result object (or an array without any paging metadata)
+func single_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc_SingleResult[AuthToken, Input, Output], requiredScope string) {
+
+	// Wrap the handler in a function that `getResult` can use
+	wrapper := func(_ echo.Context, authToken AuthToken, input Input) (Output, error) {
+		// Call the handler and return outputs to the caller
+		return handler(authToken, input)
+	}
+
+	any_result[AuthToken, Input, Output](api, fn, path, wrapper, requiredScope)
+}
+
+// register inserts a new echo.HandlerFunc into the echo router
+// that returns a paged result object.
+func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc_PagedResult[AuthToken, Input, Output], requiredScope string) {
+
+	// Wrap the handler in a function that `getResult` can use
+	wrapper := func(ctx echo.Context, authToken AuthToken, input Input) (Output, error) {
+
+		// Call the actual handler
+		output, pageInfo, err := handler(authToken, input)
+
+		// Apply paging headers to the response
+		pageInfo.SetHeaders(ctx.Request().Response)
+
+		// Return outputs to the caller
+		return output, err
+	}
+
+	any_result[AuthToken, Input, Output](api, fn, path, wrapper, requiredScope)
+}
+
+// any_result should not be called directly.  It is used by `single_result`
+// and `paged_result` to inserts a new echo.HandlerFunc into the echo router.
+// It requires a `commonWrapper` function to handle the actual request
+func any_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, wrapper commonWrapper[AuthToken, Input, Output], requiredScope string) {
 
 	const location = "toot-echo.register"
 
-	// If this Handler is not defined, then skip it.
-	if handler == nil {
+	// If this Handler is not defined, then we don't need to register anything.
+	// Calls to this route will be handled elsewhere, or will return a 404 error.
+	if wrapper == nil {
 		return
 	}
 
-	// Register a new echo.HandlerFunc in the echo Router
-	fn(path, func(ctx echo.Context) error {
+	// Create a new echo.HandlerFunc that 1) parses inputs, 2) calls the actual handler, and
+	// 3) generates a JSON response.
+	tootHandler := func(ctx echo.Context) error {
 
-		var input Input
-		var authToken AuthToken
-		var err error
+		// Parse inputs from the request
+		authToken, input, err := getInputs[AuthToken, Input](ctx, api, requiredScope)
 
-		// If the request is not public (at least one scope is required)
-		// then try to authorize the request.
-		// If no scopes are required, then an empty AuthToken
-		// will be passed to the handler.
-		if requiredScope != scope.Public {
-
-			authToken, err = api.Authorize(ctx.Request())
-
-			if err != nil {
-				return derp.Wrap(err, location, "Request is not authorized. LOL.")
-			}
-
-			// Verify the scopes required for this API call
-			if !verifyScope(authToken.Scopes(), requiredScope) {
-				return derp.NewUnauthorizedError(location, "Request is not authorized.", requiredScope, authToken.Scopes())
-			}
+		if err != nil {
+			return derp.Wrap(err, location, "Error parsing inputs")
 		}
 
-		// Collect input arguments from the Request
-		// TODO: HIGH: Replace this bind with custom binder:
-		// https://github.com/go-playground/form
-		// https://echo.labstack.com/docs/binding#custom-binding
-		binder := echo.DefaultBinder{}
-		if err := binder.Bind(&input, ctx); err != nil {
-			return derp.Wrap(err, location, "Error reading request body")
-		}
-
-		// Extra work to Bind headers, too
-		if err := binder.BindHeaders(ctx, &input); err != nil {
-			return derp.Wrap(err, location, "Error readin headers")
-		}
-
-		// Execute the API handler
-		result, err := handler(authToken, input)
+		// Call the actual handler to map the Inputs to Outputs
+		result, err := wrapper(ctx, authToken, input)
 
 		if err != nil {
 			return derp.Wrap(err, location, "Error executing API call")
@@ -73,8 +88,54 @@ func register[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[A
 
 		// Woot.
 		return nil
-	}, WithHost)
+	}
 
+	// Register the new echo.HandlerFunc with the echo Router
+	fn(path, tootHandler, WithHost)
+}
+
+func getInputs[AuthToken toot.ScopesGetter, Input any](ctx echo.Context, api toot.API[AuthToken], requiredScope string) (AuthToken, Input, error) {
+
+	const location = "toot-echo.getInputs"
+
+	var input Input
+	var authToken AuthToken
+	var err error
+
+	// If the request is not public (at least one scope is required)
+	// then try to authorize the request.
+	// If no scopes are required, then an empty AuthToken
+	// will be passed to the handler.
+	if requiredScope != scope.Public {
+
+		authToken, err = api.Authorize(ctx.Request())
+
+		if err != nil {
+			return authToken, input, derp.Wrap(err, location, "Request is not authorized. LOL.")
+		}
+
+		// Verify the scopes required for this API call
+		if !verifyScope(authToken.Scopes(), requiredScope) {
+			return authToken, input, derp.NewUnauthorizedError(location, "Request is not authorized.", requiredScope, authToken.Scopes())
+		}
+	}
+
+	// Collect input arguments from the Request
+	// TODO: HIGH: Replace this bind with custom binder:
+	// https://github.com/go-playground/form
+	// https://echo.labstack.com/docs/binding#custom-binding
+	binder := echo.DefaultBinder{}
+	if err := binder.Bind(&input, ctx); err != nil {
+		return authToken, input, derp.Wrap(err, location, "Error reading request body")
+	}
+
+	// Extra work to Bind headers, too
+	if err := binder.BindHeaders(ctx, &input); err != nil {
+		return authToken, input, derp.Wrap(err, location, "Error readin headers")
+	}
+
+	// Return success
+	return authToken, input, nil
 }
 
 // verifyScope confirms that the required scope exists in the
