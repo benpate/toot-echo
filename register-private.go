@@ -21,6 +21,11 @@ type commonWrapper[AuthToken toot.ScopesGetter, Input any, Output any] func(echo
 // that returns a single result object (or an array without any paging metadata)
 func single_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc_SingleResult[AuthToken, Input, Output], requiredScope string) {
 
+	// Do not register empty handlers
+	if handler == nil {
+		return
+	}
+
 	// Wrap the handler in a function that `getResult` can use
 	wrapper := func(_ echo.Context, authToken AuthToken, input Input) (Output, error) {
 		// Call the handler and return outputs to the caller
@@ -33,6 +38,11 @@ func single_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.
 // register inserts a new echo.HandlerFunc into the echo router
 // that returns a paged result object.
 func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc_PagedResult[AuthToken, Input, Output], requiredScope string) {
+
+	// Do not register empty handlers
+	if handler == nil {
+		return
+	}
 
 	// Wrap the handler in a function that `getResult` can use
 	wrapper := func(ctx echo.Context, authToken AuthToken, input Input) (Output, error) {
@@ -80,6 +90,9 @@ func any_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API
 		if err != nil {
 			return derp.Wrap(err, location, "Error executing API call")
 		}
+
+		// Set CORS header for the Mastodon API.
+		ctx.Response().Header().Set("Access-Control-Allow-Origin", "*")
 
 		// Return the API result to the caller as JSON
 		if err := ctx.JSON(http.StatusOK, result); err != nil {
