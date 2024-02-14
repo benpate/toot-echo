@@ -98,6 +98,7 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 	single_result(api, e.POST, route.PostFilter_Status, api.PostFilter_Status, scope.PostFilter_Status)
 	single_result(api, e.GET, route.GetFilter_Status, api.GetFilter_Status, scope.GetFilter_Status)
 	single_result(api, e.DELETE, route.DeleteFilter_Status, api.DeleteFilter_Status, scope.DeleteFilter_Status)
+	paged_result(api, e.GET, route.GetFilters_V1, api.GetFilters_V1, scope.GetFilters_V1)
 	single_result(api, e.GET, route.GetFilter_V1, api.GetFilter_V1, scope.GetFilter_V1)
 	single_result(api, e.POST, route.PostFilter_V1, api.PostFilter_V1, scope.PostFilter_V1)
 	single_result(api, e.PUT, route.PutFilter_V1, api.PutFilter_V1, scope.PutFilter_V1)
