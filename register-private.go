@@ -65,7 +65,7 @@ func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.A
 // It requires a `commonWrapper` function to handle the actual request
 func any_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, wrapper commonWrapper[AuthToken, Input, Output], requiredScope string) {
 
-	const location = "toot-echo.register"
+	const location = "toot-echo.any_result"
 
 	// If this Handler is not defined, then we don't need to register anything.
 	// Calls to this route will be handled elsewhere, or will return a 404 error.
