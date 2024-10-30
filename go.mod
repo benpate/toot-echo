@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/benpate/derp v0.31.0
-	github.com/benpate/rosetta v0.22.2
+	github.com/benpate/rosetta v0.23.0
 	github.com/benpate/toot v0.3.0
 	github.com/labstack/echo/v4 v4.12.0
 )
