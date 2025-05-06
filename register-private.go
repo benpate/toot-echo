@@ -129,7 +129,7 @@ func getInputs[AuthToken toot.ScopesGetter, Input any](ctx echo.Context, api too
 
 		// Verify the scopes required for this API call
 		if !verifyScope(authToken.Scopes(), requiredScope) {
-			return authToken, input, derp.NewUnauthorizedError(location, "Request is not authorized.", requiredScope, authToken.Scopes())
+			return authToken, input, derp.UnauthorizedError(location, "Request is not authorized.", requiredScope, authToken.Scopes())
 		}
 	}
 
