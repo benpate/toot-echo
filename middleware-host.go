@@ -1,6 +1,7 @@
 package tootecho
 
 import (
+	domaintools "github.com/benpate/domain"
 	"github.com/labstack/echo/v4"
 )
 
@@ -8,7 +9,7 @@ import (
 func WithHost(next echo.HandlerFunc) echo.HandlerFunc {
 
 	return func(ctx echo.Context) error {
-		ctx.Request().Header.Set("Host", ctx.Request().Host)
+		ctx.Request().Header.Set("Host", domaintools.Hostname(ctx.Request()))
 		return next(ctx)
 	}
 }

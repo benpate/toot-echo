@@ -6,6 +6,7 @@ toolchain go1.23.1
 
 require (
 	github.com/benpate/derp v0.32.2
+	github.com/benpate/domain v0.2.7
 	github.com/benpate/rosetta v0.25.7
 	github.com/benpate/toot v0.3.0
 	github.com/labstack/echo/v4 v4.13.3
