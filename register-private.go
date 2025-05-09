@@ -32,7 +32,7 @@ func single_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.
 		return handler(authToken, input)
 	}
 
-	any_result[AuthToken, Input, Output](api, fn, path, wrapper, requiredScope)
+	any_result(api, fn, path, wrapper, requiredScope)
 }
 
 // register inserts a new echo.HandlerFunc into the echo router
@@ -57,7 +57,7 @@ func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.A
 		return output, err
 	}
 
-	any_result[AuthToken, Input, Output](api, fn, path, wrapper, requiredScope)
+	any_result(api, fn, path, wrapper, requiredScope)
 }
 
 // any_result should not be called directly.  It is used by `single_result`
