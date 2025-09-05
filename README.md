@@ -28,8 +28,8 @@ tootecho.Register(e, api)
 
 Currently, toot-echo is the only router adapter I have created for Toot.  It should, however, be a simple project to write adapters for other routers.  If you'd like to use Toot with a different router, please get in touch and let's work together.
 
-## Project Status (Alpha?)
+## Project Status (Alpha)
 
-This project is still in early alpha testing, as I continue filling out the Mastodon support in [Emissary](https://emissary.dev).  Some interfaces may change in the future if I run into trouble making things work with this reference implementation.
+This project is still in early testing, as I continue filling out the Mastodon support in [Emissary](https://emissary.dev).  Interfaces may change in the future if I run into trouble making things work with this reference implementation.
 
 However, at this point, feedback from other developers will be immensely helpful in making Tooth a useful tool for the Go community.  Please feel free to open issues, or submit pull requests.
