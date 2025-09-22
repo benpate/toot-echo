@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.23.1
 
 require (
-	github.com/benpate/derp v0.32.8
+	github.com/benpate/derp v0.33.0
 	github.com/benpate/domain v0.2.8
 	github.com/benpate/rosetta v0.25.15
 	github.com/benpate/toot v0.3.0
