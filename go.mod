@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/benpate/derp v0.34.0
 	github.com/benpate/domain v0.2.9
-	github.com/benpate/rosetta v0.25.21
+	github.com/benpate/rosetta v0.25.23
 	github.com/benpate/toot v0.3.0
 	github.com/labstack/echo/v4 v4.13.4
 )
@@ -18,6 +18,6 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/net v0.46.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 )
