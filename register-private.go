@@ -139,7 +139,7 @@ func getInputs[AuthToken toot.ScopesGetter, Input any](ctx echo.Context, api too
 	// https://echo.labstack.com/docs/binding#custom-binding
 	binder := echo.DefaultBinder{}
 	if err := binder.Bind(&input, ctx); err != nil {
-		return authToken, input, derp.Wrap(err, location, "Error reading request body")
+		return authToken, input, derp.Wrap(err, location, "Unable to read request body")
 	}
 
 	// Extra work to Bind headers, too
