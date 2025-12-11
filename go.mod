@@ -3,7 +3,7 @@ module github.com/benpate/toot-echo
 go 1.24.0
 
 require (
-	github.com/benpate/derp v0.34.0
+	github.com/benpate/derp v0.34.2
 	github.com/benpate/domain v0.2.9
 	github.com/benpate/rosetta v0.25.23
 	github.com/benpate/toot v0.3.0
