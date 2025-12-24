@@ -113,7 +113,6 @@ func getInputs[AuthToken toot.ScopesGetter, Input any](ctx echo.Context, api too
 
 	var input Input
 	var authToken AuthToken
-	var err error
 
 	// If the request is not public (at least one scope is required)
 	// then try to authorize the request.
@@ -121,7 +120,7 @@ func getInputs[AuthToken toot.ScopesGetter, Input any](ctx echo.Context, api too
 	// will be passed to the handler.
 	if requiredScope != scope.Public {
 
-		authToken, err = api.Authorize(ctx.Request())
+		authToken, err := api.Authorize(ctx.Request())
 
 		if err != nil {
 			return authToken, input, derp.Wrap(err, location, "Request is not authorized. LOL.")
