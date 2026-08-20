@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/benpate/derp v0.39.0
 	github.com/benpate/rosetta v0.35.0
-	github.com/benpate/toot v0.4.0
+	github.com/benpate/toot v0.5.0
 	github.com/labstack/echo/v4 v4.15.4
 )
 
