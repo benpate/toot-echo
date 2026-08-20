@@ -19,7 +19,7 @@ type commonWrapper[AuthToken toot.ScopesGetter, Input any, Output any] func(echo
 
 // single_result inserts a new echo.HandlerFunc into the echo router
 // that returns a single result object (or an array without any paging metadata)
-func single_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc_SingleResult[AuthToken, Input, Output], requiredScope string) {
+func single_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc_SingleResult[AuthToken, Input, Output], requiredScope string, middleware ...echo.MiddlewareFunc) {
 
 	// Do not register empty handlers
 	if handler == nil {
@@ -32,12 +32,12 @@ func single_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.
 		return handler(authToken, input)
 	}
 
-	any_result(api, fn, path, wrapper, requiredScope)
+	any_result(api, fn, path, wrapper, requiredScope, middleware...)
 }
 
 // register inserts a new echo.HandlerFunc into the echo router
 // that returns a paged result object.
-func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc_PagedResult[AuthToken, Input, Output], requiredScope string) {
+func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, handler toot.APIFunc_PagedResult[AuthToken, Input, Output], requiredScope string, middleware ...echo.MiddlewareFunc) {
 
 	// Do not register empty handlers
 	if handler == nil {
@@ -50,32 +50,33 @@ func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.A
 		// Call the actual handler
 		output, pageInfo, err := handler(authToken, input)
 
-		// Apply paging headers to the response
-		pageInfo.SetHeaders(ctx.Request().Response)
+		// Apply paging headers to the response. These must be written into the
+		// RESPONSE header: http.Request.Response is only populated for a client
+		// following a redirect, and is always nil here on the server side.
+		pageInfo.SetHeader(ctx.Response().Header(), ctx.Request().URL.Path)
 
 		// Return outputs to the caller
 		return output, err
 	}
 
-	any_result(api, fn, path, wrapper, requiredScope)
+	any_result(api, fn, path, wrapper, requiredScope, middleware...)
 }
 
 // any_result should not be called directly.  It is used by `single_result`
 // and `paged_result` to inserts a new echo.HandlerFunc into the echo router.
 // It requires a `commonWrapper` function to handle the actual request
-func any_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, wrapper commonWrapper[AuthToken, Input, Output], requiredScope string) {
+func any_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API[AuthToken], fn echoMethod, path string, wrapper commonWrapper[AuthToken, Input, Output], requiredScope string, middleware ...echo.MiddlewareFunc) {
 
 	const location = "toot-echo.any_result"
-
-	// If this Handler is not defined, then we don't need to register anything.
-	// Calls to this route will be handled elsewhere, or will return a 404 error.
-	if wrapper == nil {
-		return
-	}
 
 	// Create a new echo.HandlerFunc that 1) parses inputs, 2) calls the actual handler, and
 	// 3) generates a JSON response.
 	tootHandler := func(ctx echo.Context) error {
+
+		// Set the CORS header FIRST, so that a browser client can also read the body
+		// of an error response.  Bearer tokens (not cookies) carry authorization here,
+		// so a wildcard origin does not expose an authenticated session.
+		ctx.Response().Header().Set("Access-Control-Allow-Origin", "*")
 
 		// Parse inputs from the request
 		authToken, input, err := getInputs[AuthToken, Input](ctx, api, requiredScope)
@@ -91,9 +92,6 @@ func any_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API
 			return derp.Wrap(err, location, "Error executing API call")
 		}
 
-		// Set CORS header for the Mastodon API.
-		ctx.Response().Header().Set("Access-Control-Allow-Origin", "*")
-
 		// Return the API result to the caller as JSON
 		if err := ctx.JSON(http.StatusOK, result); err != nil {
 			return derp.Wrap(err, location, "Error writing response body")
@@ -103,8 +101,12 @@ func any_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.API
 		return nil
 	}
 
+	// WithHost runs first, so that every handler sees a corrected Host header, and
+	// the caller's own middleware runs after it.
+	handlerMiddleware := append([]echo.MiddlewareFunc{WithHost}, middleware...)
+
 	// Register the new echo.HandlerFunc with the echo Router
-	fn(path, tootHandler, WithHost)
+	fn(path, tootHandler, handlerMiddleware...)
 }
 
 func getInputs[AuthToken toot.ScopesGetter, Input any](ctx echo.Context, api toot.API[AuthToken], requiredScope string) (AuthToken, Input, error) {
