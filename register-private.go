@@ -2,13 +2,36 @@ package tootecho
 
 import (
 	"net/http"
+	"net/url"
+	"reflect"
+	"strings"
 
 	"github.com/benpate/derp"
 	"github.com/benpate/rosetta/list"
 	"github.com/benpate/toot"
 	"github.com/benpate/toot/scope"
+	"github.com/go-playground/form/v4"
 	"github.com/labstack/echo/v4"
 )
+
+// formDecoder decodes url.Values (parsed form/multipart bodies) into Go structs,
+// including nested structs and arrays via bracket notation (e.g. "subscription[endpoint]",
+// "keywords_attributes[0][keyword]") -- something echo.DefaultBinder cannot do (see getInputs).
+// A single shared *form.Decoder is safe for concurrent use and reuses its internal struct
+// cache across requests, so it's created once here rather than per-request.
+//
+// go-playground/form defaults to dot-separated struct namespaces (e.g. "subscription.endpoint"),
+// but Mastodon (like Rails) uses brackets for struct fields too, not just array/map indices
+// (e.g. "subscription[endpoint]", "keywords_attributes[0][keyword]"). Reconfigure the
+// namespace delimiters to match what real clients actually send.
+var formDecoder = newFormDecoder()
+
+func newFormDecoder() *form.Decoder {
+	decoder := form.NewDecoder()
+	decoder.SetNamespacePrefix("[")
+	decoder.SetNamespaceSuffix("]")
+	return decoder
+}
 
 // echoMethod represents an e.GET, e.POST, e.PUT, e.DELETE method that registers
 // a new echo.HandlerFunc with the echo router.
@@ -135,22 +158,132 @@ func getInputs[AuthToken toot.ScopesGetter, Input any](ctx echo.Context, api too
 		}
 	}
 
-	// Collect input arguments from the Request
-	// TODO: HIGH: Replace this bind with custom binder:
-	// https://github.com/go-playground/form
-	// https://echo.labstack.com/docs/binding#custom-binding
+	// Collect input arguments from the Request.
+	//
+	// echo.DefaultBinder handles query params and headers correctly, but its form-body binding
+	// only matches flat keys against a field's tag string -- it cannot populate a nested struct
+	// or a variable-length array of structs (Mastodon sends both: e.g. "subscription[endpoint]",
+	// "keywords_attributes[0][keyword]"). A nested/array field silently stays zero-valued instead
+	// of erroring, which is worse than a hard failure.
+	//
+	// So: query params and headers still go through Echo's binder (no known issues there), but
+	// the request BODY -- where nested/array fields actually show up -- is decoded with
+	// go-playground/form instead, which understands bracket notation for both nested structs
+	// and arrays.
+	//
+	// Path params need their own follow-up step (decodePathParamStrings, below): Echo's
+	// BindPathParams assigns each param:"..." field the *raw* path segment exactly as captured
+	// by the router, with no percent-decoding (confirmed directly against Echo -- a path segment
+	// of "%2F" comes back as the literal three characters, not "/"). That's fine for the common
+	// case of opaque, unescaped IDs, but Mastodon account IDs can legitimately be full URLs (e.g.
+	// Emissary uses a User's ActivityPub actor URL as its Mastodon account ID), and any correct
+	// client percent-encodes such a value before putting it in a path segment.
 	binder := echo.DefaultBinder{}
-	if err := binder.Bind(&input, ctx); err != nil {
+
+	if err := binder.BindPathParams(ctx, &input); err != nil {
+		return authToken, input, derp.Wrap(err, location, "Unable to read path parameters")
+	}
+
+	if err := decodePathParamStrings(&input); err != nil {
+		return authToken, input, derp.Wrap(err, location, "Unable to decode path parameters")
+	}
+
+	if err := binder.BindQueryParams(ctx, &input); err != nil {
+		return authToken, input, derp.Wrap(err, location, "Unable to read query parameters")
+	}
+
+	if err := bindBody(ctx, &input); err != nil {
 		return authToken, input, derp.Wrap(err, location, "Unable to read request body")
 	}
 
-	// Extra work to Bind headers, too
 	if err := binder.BindHeaders(ctx, &input); err != nil {
-		return authToken, input, derp.Wrap(err, location, "Error readin headers")
+		return authToken, input, derp.Wrap(err, location, "Error reading headers")
 	}
 
 	// Return success
 	return authToken, input, nil
+}
+
+// decodePathParamStrings percent-decodes every param:"..."-tagged string field on i, in place.
+// See the comment above BindPathParams in getInputs for why this is needed: Echo assigns each
+// such field the raw, still-percent-encoded path segment, which is wrong whenever that segment
+// is meant to carry a value like a URL rather than an opaque token. This decodes every
+// param-tagged string field, not just "id", since any of them could carry the same kind of
+// value (e.g. a second ID in a nested resource route).
+func decodePathParamStrings(i interface{}) error {
+
+	v := reflect.ValueOf(i)
+
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return nil
+	}
+
+	v = v.Elem()
+
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	t := v.Type()
+
+	for index := 0; index < t.NumField(); index++ {
+
+		field := t.Field(index)
+
+		if _, hasParamTag := field.Tag.Lookup("param"); !hasParamTag {
+			continue
+		}
+
+		fieldValue := v.Field(index)
+
+		if fieldValue.Kind() != reflect.String || !fieldValue.CanSet() {
+			continue
+		}
+
+		decoded, err := url.PathUnescape(fieldValue.String())
+
+		if err != nil {
+			return err
+		}
+
+		fieldValue.SetString(decoded)
+	}
+
+	return nil
+}
+
+// bindBody reads the request body into i. Form and multipart-form bodies go through
+// formDecoder (which understands nested structs and arrays); everything else (JSON, XML,
+// or no body at all) falls back to echo's own body binder.
+func bindBody(ctx echo.Context, i interface{}) error {
+
+	req := ctx.Request()
+
+	if req.ContentLength == 0 {
+		return nil
+	}
+
+	base, _, _ := strings.Cut(req.Header.Get(echo.HeaderContentType), ";")
+
+	switch strings.TrimSpace(base) {
+
+	case echo.MIMEApplicationForm:
+		if err := req.ParseForm(); err != nil {
+			return err
+		}
+		return formDecoder.Decode(i, req.Form)
+
+	case echo.MIMEMultipartForm:
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			return err
+		}
+		return formDecoder.Decode(i, req.MultipartForm.Value)
+
+	default:
+		// JSON, XML, or anything else -- echo already handles these correctly.
+		binder := echo.DefaultBinder{}
+		return binder.BindBody(ctx, i)
+	}
 }
 
 // verifyScope confirms that the required scope exists in the

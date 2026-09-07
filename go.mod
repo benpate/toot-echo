@@ -6,6 +6,7 @@ require (
 	github.com/benpate/derp v0.39.0
 	github.com/benpate/rosetta v0.35.0
 	github.com/benpate/toot v0.5.0
+	github.com/go-playground/form/v4 v4.3.0
 	github.com/labstack/echo/v4 v4.15.4
 )
 
@@ -20,3 +21,5 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 )
+
+replace github.com/benpate/toot => /Users/sheriflawal/Dev/toot
