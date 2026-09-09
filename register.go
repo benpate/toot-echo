@@ -21,6 +21,7 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 	single_result(api, e.POST, route.PostAccount, api.PostAccount, scope.PostAccount, middleware...)
 	single_result(api, e.GET, route.GetAccount_VerifyCredentials, api.GetAccount_VerifyCredentials, scope.GetAccount_VerifyCredentials, middleware...)
 	single_result(api, e.PATCH, route.PatchAccount_UpdateCredentials, api.PatchAccount_UpdateCredentials, scope.PatchAccount_UpdateCredentials, middleware...)
+	single_result(api, e.GET, route.GetAccounts, api.GetAccounts, scope.GetAccounts, middleware...)
 	single_result(api, e.GET, route.GetAccount, api.GetAccount, scope.GetAccount, middleware...)
 	paged_result(api, e.GET, route.GetAccount_Statuses, api.GetAccount_Statuses, scope.GetAccount_Statuses, middleware...)
 	paged_result(api, e.GET, route.GetAccount_Followers, api.GetAccount_Followers, scope.GetAccount_Followers, middleware...)
