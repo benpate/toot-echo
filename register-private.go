@@ -76,7 +76,12 @@ func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.A
 		// Apply paging headers to the response. These must be written into the
 		// RESPONSE header: http.Request.Response is only populated for a client
 		// following a redirect, and is always nil here on the server side.
-		pageInfo.SetHeader(ctx.Response().Header(), ctx.Request().URL.Path)
+		//
+		// RULE: PageInfo.SetHeader prefixes the Link header with its "path"
+		// argument verbatim, so it must be an absolute URL. Clients follow the
+		// Link header as-is, and a bare path fails with "unsupported URL".
+		baseURL := ctx.Scheme() + "://" + ctx.Request().Host + ctx.Request().URL.Path
+		pageInfo.SetHeader(ctx.Response().Header(), baseURL)
 
 		// Return outputs to the caller
 		return output, err
