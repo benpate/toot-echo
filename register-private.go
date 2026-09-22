@@ -1,6 +1,7 @@
 package tootecho
 
 import (
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -318,6 +319,58 @@ func expandEmptyBracketArrays(values url.Values) url.Values {
 	}
 
 	return result
+}
+
+// fileHeaderType is *multipart.FileHeader, cached once rather than reflected on every call.
+var fileHeaderType = reflect.TypeOf((*multipart.FileHeader)(nil))
+
+// bindMultipartFiles sets every *multipart.FileHeader field on i (matched by its form tag)
+// from the uploaded files a multipart request carried. A missing or unmatched field is left
+// untouched, not an error.
+func bindMultipartFiles(i interface{}, fileForm map[string][]*multipart.FileHeader) error {
+
+	if len(fileForm) == 0 {
+		return nil
+	}
+
+	v := reflect.ValueOf(i)
+
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return nil
+	}
+
+	v = v.Elem()
+
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	t := v.Type()
+
+	for index := 0; index < t.NumField(); index++ {
+
+		field := t.Field(index)
+
+		if field.Type != fileHeaderType {
+			continue
+		}
+
+		tag, _, _ := strings.Cut(field.Tag.Get("form"), ",")
+
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		files := fileForm[tag]
+
+		if len(files) == 0 {
+			continue
+		}
+
+		v.Field(index).Set(reflect.ValueOf(files[0]))
+	}
+
+	return nil
 }
 
 // verifyScope confirms that the required scope exists in the
