@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/benpate/derp"
@@ -289,6 +290,34 @@ func bindBody(ctx echo.Context, i interface{}) error {
 		binder := echo.DefaultBinder{}
 		return binder.BindBody(ctx, i)
 	}
+}
+
+// expandEmptyBracketArrays rewrites every "field[]" key (each value sent as its own repeated
+// key, e.g. "media_ids[]=1&media_ids[]=2") into the indexed "field[0]", "field[1]", ... keys
+// formDecoder actually understands. A key with no trailing "[]" passes through untouched.
+//
+// RULE: real Mastodon clients encode every array field this way; go-playground/form only
+// understands an explicit index and errors on an empty one.
+func expandEmptyBracketArrays(values url.Values) url.Values {
+
+	result := make(url.Values, len(values))
+
+	for key, fieldValues := range values {
+
+		base, isArray := strings.CutSuffix(key, "[]")
+
+		if !isArray {
+			result[key] = fieldValues
+			continue
+		}
+
+		for index, value := range fieldValues {
+			indexedKey := base + "[" + strconv.Itoa(index) + "]"
+			result[indexedKey] = append(result[indexedKey], value)
+		}
+	}
+
+	return result
 }
 
 // verifyScope confirms that the required scope exists in the
