@@ -1,6 +1,7 @@
 package tootecho
 
 import (
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -275,16 +276,36 @@ func bindBody(ctx echo.Context, i interface{}) error {
 	switch strings.TrimSpace(base) {
 
 	case echo.MIMEApplicationForm:
-		if err := req.ParseForm(); err != nil {
+
+		// RULE: Request.ParseForm only reads the body for POST/PUT/PATCH -- DELETE (Mastodon's
+		// list/filter/keyword "remove" endpoints) needs its body parsed independent of method.
+		body, err := io.ReadAll(req.Body)
+
+		if err != nil {
 			return err
 		}
-		return formDecoder.Decode(i, req.Form)
+
+		values, err := url.ParseQuery(string(body))
+
+		if err != nil {
+			return err
+		}
+
+		return formDecoder.Decode(i, expandEmptyBracketArrays(values))
 
 	case echo.MIMEMultipartForm:
 		if err := req.ParseMultipartForm(32 << 20); err != nil {
 			return err
 		}
-		return formDecoder.Decode(i, req.MultipartForm.Value)
+
+		if err := formDecoder.Decode(i, expandEmptyBracketArrays(req.MultipartForm.Value)); err != nil {
+			return err
+		}
+
+		// go-playground/form decodes url.Values (text fields) -- it has no concept of an
+		// uploaded file, which lives in req.MultipartForm.File instead. A *multipart.FileHeader
+		// field (e.g. Mastodon's media upload) needs its own pass to bind those.
+		return bindMultipartFiles(i, req.MultipartForm.File)
 
 	default:
 		// JSON, XML, or anything else -- echo already handles these correctly.
