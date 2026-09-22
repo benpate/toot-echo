@@ -145,6 +145,8 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 
 	// https://docs.joinmastodon.org/methods/media/
 	single_result(api, e.POST, route.PostMedia, api.PostMedia, scope.PostMedia, middleware...)
+	single_result(api, e.GET, route.GetMedia, api.GetMedia, scope.GetMedia, middleware...)
+	single_result(api, e.PUT, route.PutMedia, api.PutMedia, scope.PutMedia, middleware...)
 
 	// https://docs.joinmastodon.org/methods/mutes/
 	paged_result(api, e.GET, route.GetMutes, api.GetMutes, scope.GetMutes, middleware...)
@@ -154,6 +156,8 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 	single_result(api, e.GET, route.GetNotification, api.GetNotification, scope.GetNotification, middleware...)
 	single_result(api, e.POST, route.PostNotifications_Clear, api.PostNotifications_Clear, scope.PostNotifications_Clear, middleware...)
 	single_result(api, e.POST, route.PostNotification_Dismiss, api.PostNotification_Dismiss, scope.PostNotification_Dismiss, middleware...)
+	single_result(api, e.GET, route.GetNotifications_UnreadCount, api.GetNotifications_UnreadCount, scope.GetNotifications_UnreadCount, middleware...)
+	single_result(api, e.GET, route.GetNotificationPolicy, api.GetNotificationPolicy, scope.GetNotificationPolicy, middleware...)
 
 	// https://docs.joinmastodon.org/methods/oauth/
 	single_result(api, e.GET, route.GetOAuth_Authorize, api.GetOAuth_Authorize, scope.GetOAuth_Authorize, middleware...)
