@@ -21,11 +21,13 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 	single_result(api, e.POST, route.PostAccount, api.PostAccount, scope.PostAccount, middleware...)
 	single_result(api, e.GET, route.GetAccount_VerifyCredentials, api.GetAccount_VerifyCredentials, scope.GetAccount_VerifyCredentials, middleware...)
 	single_result(api, e.PATCH, route.PatchAccount_UpdateCredentials, api.PatchAccount_UpdateCredentials, scope.PatchAccount_UpdateCredentials, middleware...)
+	single_result(api, e.GET, route.GetAccounts, api.GetAccounts, scope.GetAccounts, middleware...)
 	single_result(api, e.GET, route.GetAccount, api.GetAccount, scope.GetAccount, middleware...)
 	paged_result(api, e.GET, route.GetAccount_Statuses, api.GetAccount_Statuses, scope.GetAccount_Statuses, middleware...)
 	paged_result(api, e.GET, route.GetAccount_Followers, api.GetAccount_Followers, scope.GetAccount_Followers, middleware...)
 	paged_result(api, e.GET, route.GetAccount_Following, api.GetAccount_Following, scope.GetAccount_Following, middleware...)
 	paged_result(api, e.GET, route.GetAccount_FeaturedTags, api.GetAccount_FeaturedTags, scope.GetAccount_FeaturedTags, middleware...)
+	paged_result(api, e.GET, route.GetAccount_Endorsements, api.GetAccount_Endorsements, scope.GetAccount_Endorsements, middleware...)
 	single_result(api, e.GET, route.GetAccount_Lists, api.GetAccount_Lists, scope.GetAccount_Lists, middleware...)
 	single_result(api, e.POST, route.PostAccount_Follow, api.PostAccount_Follow, scope.PostAccount_Follow, middleware...)
 	single_result(api, e.POST, route.PostAccount_Unfollow, api.PostAccount_Unfollow, scope.PostAccount_Unfollow, middleware...)
@@ -143,6 +145,8 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 
 	// https://docs.joinmastodon.org/methods/media/
 	single_result(api, e.POST, route.PostMedia, api.PostMedia, scope.PostMedia, middleware...)
+	single_result(api, e.GET, route.GetMedia, api.GetMedia, scope.GetMedia, middleware...)
+	single_result(api, e.PUT, route.PutMedia, api.PutMedia, scope.PutMedia, middleware...)
 
 	// https://docs.joinmastodon.org/methods/mutes/
 	paged_result(api, e.GET, route.GetMutes, api.GetMutes, scope.GetMutes, middleware...)
@@ -152,6 +156,8 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 	single_result(api, e.GET, route.GetNotification, api.GetNotification, scope.GetNotification, middleware...)
 	single_result(api, e.POST, route.PostNotifications_Clear, api.PostNotifications_Clear, scope.PostNotifications_Clear, middleware...)
 	single_result(api, e.POST, route.PostNotification_Dismiss, api.PostNotification_Dismiss, scope.PostNotification_Dismiss, middleware...)
+	single_result(api, e.GET, route.GetNotifications_UnreadCount, api.GetNotifications_UnreadCount, scope.GetNotifications_UnreadCount, middleware...)
+	single_result(api, e.GET, route.GetNotificationPolicy, api.GetNotificationPolicy, scope.GetNotificationPolicy, middleware...)
 
 	// https://docs.joinmastodon.org/methods/oauth/
 	single_result(api, e.GET, route.GetOAuth_Authorize, api.GetOAuth_Authorize, scope.GetOAuth_Authorize, middleware...)
@@ -167,6 +173,12 @@ func Register[AuthToken toot.ScopesGetter](e *echo.Echo, api toot.API[AuthToken]
 
 	// https://docs.joinmastodon.org/methods/preferences/
 	single_result(api, e.GET, route.GetPreferences, api.GetPreferences, scope.GetPreferences, middleware...)
+
+	// https://docs.joinmastodon.org/methods/push/
+	single_result(api, e.POST, route.PostPushSubscription, api.PostPushSubscription, scope.PostPushSubscription, middleware...)
+	single_result(api, e.GET, route.GetPushSubscription, api.GetPushSubscription, scope.GetPushSubscription, middleware...)
+	single_result(api, e.PUT, route.PutPushSubscription, api.PutPushSubscription, scope.PutPushSubscription, middleware...)
+	single_result(api, e.DELETE, route.DeletePushSubscription, api.DeletePushSubscription, scope.DeletePushSubscription, middleware...)
 
 	// https://docs.joinmastodon.org/methods/profile/
 	single_result(api, e.DELETE, route.DeleteProfile_Avatar, api.DeleteProfile_Avatar, scope.DeleteProfile_Avatar, middleware...)
