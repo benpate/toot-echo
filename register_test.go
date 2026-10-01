@@ -104,8 +104,8 @@ func TestRegister_PagedResultSetsLinkHeader(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	e.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/accounts/123/followers?limit=20", nil))
 
-	expected := `</api/v1/accounts/123/followers?max_id=ZZZ>; rel="next", ` +
-		`</api/v1/accounts/123/followers?min_id=AAA>; rel="prev"`
+	expected := `<http://example.com/api/v1/accounts/123/followers?max_id=ZZZ>; rel="next", ` +
+		`<http://example.com/api/v1/accounts/123/followers?min_id=AAA>; rel="prev"`
 
 	if got := recorder.Header().Get("Link"); got != expected {
 		t.Errorf("expected Link %q, got %q", expected, got)
