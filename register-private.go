@@ -151,9 +151,19 @@ func getInputs[AuthToken toot.ScopesGetter, Input any](ctx echo.Context, api too
 
 	// If the request is not public (at least one scope is required)
 	// then try to authorize the request.
-	// If no scopes are required, then an empty AuthToken
-	// will be passed to the handler.
-	if requiredScope != scope.Public {
+	// A public request is open to anyone, so it is never refused; but when the
+	// caller did send a valid token, the handler still gets to know who is asking.
+	// Otherwise, an empty AuthToken will be passed to the handler.
+	if requiredScope == scope.Public {
+
+		if api.Authorize != nil {
+
+			if token, err := api.Authorize(ctx.Request()); err == nil {
+				authToken = token
+			}
+		}
+
+	} else {
 
 		var err error
 		authToken, err = api.Authorize(ctx.Request())
