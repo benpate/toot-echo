@@ -83,7 +83,9 @@ func paged_result[AuthToken toot.ScopesGetter, Input any, Output any](api toot.A
 		// RULE: PageInfo.SetHeader prefixes the Link header with its "path"
 		// argument verbatim, so it must be an absolute URL. Clients follow the
 		// Link header as-is, and a bare path fails with "unsupported URL".
-		baseURL := ctx.Scheme() + "://" + ctx.Request().Host + ctx.Request().URL.Path
+		//
+		// The query string goes along too, so that each link keeps the request's filters.
+		baseURL := ctx.Scheme() + "://" + ctx.Request().Host + ctx.Request().URL.RequestURI()
 		pageInfo.SetHeader(ctx.Response().Header(), baseURL)
 
 		// Return outputs to the caller
