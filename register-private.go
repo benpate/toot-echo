@@ -1,9 +1,12 @@
 package tootecho
 
 import (
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/benpate/derp"
@@ -273,22 +276,122 @@ func bindBody(ctx echo.Context, i interface{}) error {
 	switch strings.TrimSpace(base) {
 
 	case echo.MIMEApplicationForm:
-		if err := req.ParseForm(); err != nil {
+
+		// RULE: Request.ParseForm only reads the body for POST/PUT/PATCH -- DELETE (Mastodon's
+		// list/filter/keyword "remove" endpoints) needs its body parsed independent of method.
+		body, err := io.ReadAll(req.Body)
+
+		if err != nil {
 			return err
 		}
-		return formDecoder.Decode(i, req.Form)
+
+		values, err := url.ParseQuery(string(body))
+
+		if err != nil {
+			return err
+		}
+
+		return formDecoder.Decode(i, expandEmptyBracketArrays(values))
 
 	case echo.MIMEMultipartForm:
 		if err := req.ParseMultipartForm(32 << 20); err != nil {
 			return err
 		}
-		return formDecoder.Decode(i, req.MultipartForm.Value)
+
+		if err := formDecoder.Decode(i, expandEmptyBracketArrays(req.MultipartForm.Value)); err != nil {
+			return err
+		}
+
+		// go-playground/form decodes url.Values (text fields) -- it has no concept of an
+		// uploaded file, which lives in req.MultipartForm.File instead. A *multipart.FileHeader
+		// field (e.g. Mastodon's media upload) needs its own pass to bind those.
+		return bindMultipartFiles(i, req.MultipartForm.File)
 
 	default:
 		// JSON, XML, or anything else -- echo already handles these correctly.
 		binder := echo.DefaultBinder{}
 		return binder.BindBody(ctx, i)
 	}
+}
+
+// expandEmptyBracketArrays rewrites every "field[]" key (each value sent as its own repeated
+// key, e.g. "media_ids[]=1&media_ids[]=2") into the indexed "field[0]", "field[1]", ... keys
+// formDecoder actually understands. A key with no trailing "[]" passes through untouched.
+//
+// RULE: real Mastodon clients encode every array field this way; go-playground/form only
+// understands an explicit index and errors on an empty one.
+func expandEmptyBracketArrays(values url.Values) url.Values {
+
+	result := make(url.Values, len(values))
+
+	for key, fieldValues := range values {
+
+		base, isArray := strings.CutSuffix(key, "[]")
+
+		if !isArray {
+			result[key] = fieldValues
+			continue
+		}
+
+		for index, value := range fieldValues {
+			indexedKey := base + "[" + strconv.Itoa(index) + "]"
+			result[indexedKey] = append(result[indexedKey], value)
+		}
+	}
+
+	return result
+}
+
+// fileHeaderType is *multipart.FileHeader, cached once rather than reflected on every call.
+var fileHeaderType = reflect.TypeOf((*multipart.FileHeader)(nil))
+
+// bindMultipartFiles sets every *multipart.FileHeader field on i (matched by its form tag)
+// from the uploaded files a multipart request carried. A missing or unmatched field is left
+// untouched, not an error.
+func bindMultipartFiles(i interface{}, fileForm map[string][]*multipart.FileHeader) error {
+
+	if len(fileForm) == 0 {
+		return nil
+	}
+
+	v := reflect.ValueOf(i)
+
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return nil
+	}
+
+	v = v.Elem()
+
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	t := v.Type()
+
+	for index := 0; index < t.NumField(); index++ {
+
+		field := t.Field(index)
+
+		if field.Type != fileHeaderType {
+			continue
+		}
+
+		tag, _, _ := strings.Cut(field.Tag.Get("form"), ",")
+
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		files := fileForm[tag]
+
+		if len(files) == 0 {
+			continue
+		}
+
+		v.Field(index).Set(reflect.ValueOf(files[0]))
+	}
+
+	return nil
 }
 
 // verifyScope confirms that the required scope exists in the
