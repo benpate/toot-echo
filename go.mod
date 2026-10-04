@@ -7,7 +7,7 @@ require (
 	github.com/benpate/rosetta v0.35.0
 	github.com/benpate/toot v0.7.0
 	github.com/go-playground/form/v4 v4.3.0
-	github.com/labstack/echo/v4 v4.15.4
+	github.com/labstack/echo/v4 v4.16.0
 	github.com/stretchr/testify v1.12.0
 )
 
