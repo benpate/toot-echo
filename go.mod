@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/benpate/derp v0.39.0
 	github.com/benpate/rosetta v0.35.0
-	github.com/benpate/toot v0.6.0
+	github.com/benpate/toot v0.7.0
 	github.com/go-playground/form/v4 v4.3.0
 	github.com/labstack/echo/v4 v4.15.4
 	github.com/stretchr/testify v1.12.0
