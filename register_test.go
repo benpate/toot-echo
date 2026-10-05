@@ -184,3 +184,45 @@ func TestRegister_PagedResultKeepsFiltersOnLinks(t *testing.T) {
 		t.Errorf("expected Link %q, got %q", expected, got)
 	}
 }
+
+// The favourites and bookmarks lists are paged too, so their Link header is written and the cursor round-trips.
+func TestRegister_FavouritesAndBookmarksSetLinkHeader(t *testing.T) {
+
+	api := toot.New(func(*http.Request) (testToken, error) {
+		return testToken{}, nil
+	})
+
+	var receivedMaxID string
+
+	api.GetFavourites = func(_ testToken, input txn.GetFavourites) ([]object.Status, toot.PageInfo, error) {
+		receivedMaxID = input.MaxID
+		return []object.Status{}, toot.PageInfo{MaxID: "1700"}, nil
+	}
+
+	api.GetBookmarks = func(testToken, txn.GetBookmarks) ([]object.Status, toot.PageInfo, error) {
+		return []object.Status{}, toot.PageInfo{MaxID: "900"}, nil
+	}
+
+	e := echo.New()
+	Register(e, api)
+
+	for path, expected := range map[string]string{
+		"/api/v1/favourites?limit=20": `<http://example.com/api/v1/favourites?max_id=1700&limit=20>; rel="next"`,
+		"/api/v1/bookmarks?limit=20":  `<http://example.com/api/v1/bookmarks?max_id=900&limit=20>; rel="next"`,
+	} {
+		recorder := httptest.NewRecorder()
+		e.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+
+		if got := recorder.Header().Get("Link"); got != expected {
+			t.Errorf("%s: expected Link %q, got %q", path, expected, got)
+		}
+	}
+
+	// A client following the link sends the cursor back
+	recorder := httptest.NewRecorder()
+	e.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/favourites?max_id=1700&limit=20", nil))
+
+	if receivedMaxID != "1700" {
+		t.Errorf("expected max_id 1700 to reach the handler, got %q", receivedMaxID)
+	}
+}
